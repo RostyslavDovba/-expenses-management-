@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Manager</title>
+	<style>
+		.center {
+		    margin: auto;
+		    width: 50%;
+		    border: 1px solid green;
+		    padding: 10px;
+			text-align: center;
+		}
+		fieldset { 
+		    display: block;
+		    margin-left: 2px;
+		    margin-right: 2px;
+		    padding-top: 0.35em;
+		    padding-bottom: 0.625em;
+		    padding-left: 0.75em;
+		    padding-right: 0.75em;
+		    border: 2px groove;
+		}
+		input {
+		 padding: 5px;
+		  width: 50%;
+		  margin: 10px;
+		}
+		.errormessage{
+			color: red;
+		}
+		.successmessage{
+			color: green;
+		}
+</style>
+</head>
+<body>
+	
+<body>
+	<div class="center">
+		<label for="command">Enter command:</label> 
+		<input id="command" type="text"/>
+		<button onclick="ProcessCommand();">Execute command</button>
+	</div>
+	<div class="center">
+	 <fieldset>
+	    <legend>Command Results:</legend> 
+	     <div id="result">
+	     </div>	 
+	 </fieldset>
+	</div>
+  <script>
+
+
+	  var Data = JSON.parse(localStorage.getItem('data'));
+	  if(!Data)
+	  var Data = new Array();
+
+	  function ProcessCommand() {
+		let input = document.getElementById("command").value; 
+		if(input.length > 0) {
+			let data = input.split(' ');
+			if(data.length > 0) { 
+				switch(data[0].toLowerCase()) {
+	              case 'add':
+	                 processAddCommand(data);
+					 break;
+	              case 'list':
+					list();
+					break;
+				  case 'clear':
+					Clear(data);
+					break;
+				  case 'total':
+					total(data);
+					break;
+	              default:
+				   LogError("Unknown command");
+				   break;
+				}
+			}
+		}
+	}
+	  function LogError(message) {
+		let result = document.getElementById("result"); 
+		result.innerHTML = '<span class="errormessage">'+message+'</span>';
+	  }
+
+	  function LogSuccessMessage(message) {
+		let result = document.getElementById("result"); 
+		result.innerHTML = '<span class="successmessage">'+message+'</span>';
+	  }
+
+	  function processAddCommand(record) {
+		if(record.length < 5) {
+			LogError("Invalid add command");
+			return;
+		}
+		var newrecord = { 
+		   date: record[1],
+		   amount:  record[2],
+		   currency:  record[3],
+			description: ''	   
+		}
+		
+		for(i = 4; i < record.length; i ++)	
+			newrecord.description +=  record[i];
+		
+		  Data.push(newrecord);
+		  Data.sort(comparator);
+		  localStorage.setItem("data", JSON.stringify(Data));
+		  LogSuccessMessage("Record added");
+	  }
+	  
+	  function list() {
+		let result = document.getElementById("result"); 
+		var text = '';
+		Data.forEach(function (arrayItem) {
+			text += 'Date: '+ arrayItem.date + ', Amount: '+ arrayItem.amount + ', Currency: '+ arrayItem.currency + ', Description: '+ arrayItem.description + '<br>';
+		});
+		result.innerHTML = text;
+		
+	  }
+  
+	  function Clear(record) {
+	    if(record.length != 2) {
+			LogError("Invalid clear command");
+			return;
+		}
+		Data = Data.filter(obj => obj.date != record[1]);
+		localStorage.setItem("data", JSON.stringify(Data));
+	    LogSuccessMessage("Records removed");
+	  }
+
+	  function total(record)
+	  {
+		if(record.length != 2)
+		{
+			LogError("Invalid total command");
+			return;
+		}
+		let amounts = new Array();
+		Data.forEach(function (arrayItem) {
+		    var records = amounts.filter(obj => obj.currency == arrayItem.currency);
+			if(records.length > 0)
+			  records[0].amount +=parseFloat(arrayItem.amount);
+			 else
+			  amounts.push({currency : arrayItem.currency, amount:parseFloat(arrayItem.amount)});		
+		});	
+		var total = 0;	
+				let url = 'http://data.fixer.io/api/latest?access_key=52092cfe28904e9db59f7bdbdc461d0e'; 
+			var xmlhttp = new XMLHttpRequest();
+
+			xmlhttp.onreadystatechange = function() {
+				if (xmlhttp.readyState == XMLHttpRequest.DONE) {   
+					if (xmlhttp.status == 200) {
+						let result = JSON.parse(xmlhttp.response);
+						if(result.success)
+						{
+							let allrates = result.rates;
+							var searchedrate = Object.entries(allrates).filter(obj => obj[0] == record[1]);
+							if(searchedrate.length == 0)
+							{
+								LogError("Currency " +record[1]+ " not found ");
+								return;
+							}
+							amounts.forEach(function (arrayItem) {
+	                               var rate = Object.entries(allrates).filter(obj => obj[0] == arrayItem.currency);
+								   if(rate.length > 0)
+								   {
+								      total += arrayItem.amount * rate[0][1] * searchedrate[0][1];
+								   }
+							});
+							LogSuccessMessage("Total Amount: " + total + ' ' + record[1]);
+						}
+						else
+							LogError("Faild to retreive amount");
+				}
+				else if (xmlhttp.status == 400) {
+	              alert('There was an error 400');
+	           }
+	           else {
+	               alert('something else other than 200 was returned');
+	           }
+				}
+			};
+
+			xmlhttp.open("GET", url, true);
+			xmlhttp.send();		
+	  }
+  
+	function comparator(a,b) {
+	  if (a.date < b.date)
+	    return -1;
+	  if (a.date > b.date)
+	    return 1;
+	  return 0;
+	}
+
+  </script>
+</body>
+</html>
